@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- DistrictMapper.xml -->
+<mapper namespace="com.military.asset.mapper.DistrictMapper">
+    <select id="selectByName" resultType="com.military.asset.entity.District">
+        SELECT * FROM district WHERE name LIKE CONCAT('%', #{name}, '%')
+    </select>
+
+    <select id="selectAll" resultType="com.military.asset.entity.District">
+        SELECT code, name, parent_code AS parentCode, level, province FROM district
+    </select>
+</mapper>

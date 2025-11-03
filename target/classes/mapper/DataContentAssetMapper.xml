@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- namespace绑定数据内容资产Mapper接口 -->
+<mapper namespace="com.military.asset.mapper.DataContentAssetMapper">
+
+    <!-- 实现selectAllExistingIds方法 -->
+    <select id="selectAllExistingIds" resultType="java.lang.String">
+        SELECT id FROM data_content_asset
+    </select>
+
+    <!-- 实现insertBatch方法：批量插入数据内容资产 -->
+    <insert id="insertBatch" parameterType="java.util.List" useGeneratedKeys="false">
+        INSERT INTO data_content_asset (
+        id,
+        report_unit,
+        category_code,
+        asset_category,
+        asset_name,
+        development_tool,  -- 开发工具（数据资产特有核心字段）
+        actual_quantity,
+        unit,
+        inventory_unit,
+        province,
+        city,
+        data_type,         -- 数据类型（数据资产特有字段）
+        acquisition_method,
+        function_brief,
+        application_field, -- 应用领域（数据资产特有字段）
+        update_cycle,      -- 更新周期（数据资产特有字段）
+        update_method,     -- 更新方式（数据资产特有字段）
+        unit_price,
+        amount,
+        pricing_method,
+        pricing_description,
+        create_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.id},
+            #{item.reportUnit},
+            #{item.categoryCode},
+            #{item.assetCategory},
+            #{item.assetName},
+            #{item.developmentTool},  -- 开发工具（必须非空）
+            #{item.actualQuantity},
+            #{item.unit},
+            #{item.inventoryUnit},
+            #{item.province},
+            #{item.city},
+            #{item.dataType},
+            #{item.acquisitionMethod},
+            #{item.functionBrief},
+            #{item.applicationField},
+            #{item.updateCycle},
+            #{item.updateMethod},
+            #{item.unitPrice},
+            #{item.amount},
+            #{item.pricingMethod},
+            #{item.pricingDescription},
+            NOW()
+            )
+        </foreach>
+    </insert>
+
+    <!-- 实现selectByReportUnitAndCategory方法：组合查询 -->
+    <select id="selectByReportUnitAndCategory" resultType="com.military.asset.entity.DataContentAsset">
+        SELECT * FROM data_content_asset
+        <where>
+            <if test="reportUnit != null and reportUnit.trim() != ''">
+                report_unit = #{reportUnit}
+            </if>
+            <if test="assetCategory != null and assetCategory.trim() != ''">
+                AND asset_category = #{assetCategory}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 实现selectByDevelopmentTool方法：按开发工具筛选 -->
+    <select id="selectByDevelopmentTool" resultType="com.military.asset.entity.DataContentAsset">
+        SELECT * FROM data_content_asset
+        WHERE development_tool = #{developmentTool} -- 精确匹配开发工具
+    </select>
+
+</mapper>

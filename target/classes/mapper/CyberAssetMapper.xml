@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MyBatis Mapper XML文件
+  作用：定义SQL语句，实现与数据库的交互
+  约束文件：mybatis-3-mapper.dtd，规定了XML的语法规则
+-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  mapper标签：根标签
+  namespace属性：必须与Mapper接口的全限定名完全一致
+  作用：建立XML与Mapper接口的绑定关系
+-->
+<mapper namespace="com.military.asset.mapper.CyberAssetMapper">
+
+    <!--
+      select标签：查询操作
+      id属性：必须与Mapper接口中的方法名一致
+      resultType：查询结果类型（此处为String，对应数据库id字段）
+      功能：查询所有已存在的网信资产ID，用于Excel导入时的去重校验
+    -->
+    <select id="selectAllExistingIds" resultType="java.lang.String">
+        SELECT id FROM cyber_asset
+    </select>
+
+    <!--
+      insert标签：插入操作
+      id属性：与Mapper接口方法名一致
+      parameterType：参数类型（此处为List集合，用于批量插入）
+      useGeneratedKeys="false"：关闭自动生成主键（因id由业务生成，非数据库自增）
+      功能：批量插入网信资产数据，提高导入效率
+    -->
+    <insert id="insertBatch" parameterType="java.util.List" useGeneratedKeys="false">
+        INSERT INTO cyber_asset (
+        id,                  -- 资产唯一标识（主键）
+        report_unit,         -- 上报单位
+        category_code,       -- 分类编码
+        asset_category,      -- 资产分类
+        asset_name,          -- 资产名称
+        asset_content,       -- 资产内容（网信资产特有字段）
+        actual_quantity,     -- 实有数量
+        unit,                -- 计量单位
+        put_into_use_date,   -- 投入使用日期
+        used_quantity,       -- 已用数量
+        inventory_unit,      -- 盘点单位
+        province,            -- 所在省份
+        city,                -- 所在城市
+        support_object,      -- 保障对象
+        unit_price,          -- 单价
+        amount,              -- 总金额
+        pricing_method,      -- 计价方法
+        pricing_description, -- 计价说明
+        inventory_remark,    -- 盘点备注
+        valuation_remark,    -- 核价备注
+        original_account_remark, -- 原始账备注
+        create_time          -- 记录创建时间
+        ) VALUES
+        <!--
+          foreach标签：循环遍历集合参数
+          collection="list"：集合参数名称（与接口方法参数一致）
+          item="item"：集合中每个元素的别名
+          separator=","：元素之间的分隔符（此处用于分隔多条VALUES语句）
+        -->
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.id},                  -- 取集合元素的id属性
+            #{item.reportUnit},          -- 取reportUnit属性（对应实体类字段）
+            #{item.categoryCode},        -- 取categoryCode属性
+            #{item.assetCategory},       -- 取assetCategory属性
+            #{item.assetName},           -- 取assetName属性
+            #{item.assetContent},        -- 取assetContent属性
+            #{item.actualQuantity},      -- 取actualQuantity属性
+            #{item.unit},                -- 取unit属性
+            #{item.putIntoUseDate},      -- 取putIntoUseDate属性（LocalDate类型）
+            #{item.usedQuantity},        -- 取usedQuantity属性
+            #{item.inventoryUnit},       -- 取inventoryUnit属性
+            #{item.province},            -- 取province属性
+            #{item.city},                -- 取city属性
+            #{item.supportObject},       -- 取supportObject属性
+            #{item.unitPrice},           -- 取unitPrice属性
+            #{item.amount},              -- 取amount属性
+            #{item.pricingMethod},       -- 取pricingMethod属性
+            #{item.pricingDescription},  -- 取pricingDescription属性
+            #{item.inventoryRemark},     -- 取inventoryRemark属性
+            #{item.valuationRemark},     -- 取valuationRemark属性
+            #{item.originalAccountRemark}, -- 取originalAccountRemark属性
+            NOW()                       -- 使用MySQL当前时间函数（数据库服务器时间）
+            )
+        </foreach>
+    </insert>
+
+    <!--
+      select标签：条件查询
+      resultType：查询结果类型（完整类名，对应实体类）
+      功能：根据上报单位和资产分类查询网信资产列表
+    -->
+    <select id="selectByReportUnitAndCategory" resultType="com.military.asset.entity.CyberAsset">
+        SELECT * FROM cyber_asset
+        <!--
+          where标签：自动处理SQL条件拼接
+          作用：1. 自动添加WHERE关键字；2. 智能去除条件前多余的AND/OR
+        -->
+        <where>
+            <!--
+              if标签：条件判断
+              test属性：判断表达式（OGNL语法）
+              作用：当reportUnit不为空且非空字符串时，才添加该条件
+            -->
+            <if test="reportUnit != null and reportUnit.trim() != ''">
+                report_unit = #{reportUnit}
+            </if>
+            <!-- 当assetCategory有值时，添加该条件（注意前面的AND） -->
+            <if test="assetCategory != null and assetCategory.trim() != ''">
+                AND asset_category = #{assetCategory}
+            </if>
+        </where>
+        <!-- 按创建时间降序排列，最新数据在前 -->
+        ORDER BY create_time DESC
+    </select>
+
+    <!--
+      select标签：范围查询
+      功能：根据已用数量的范围（min到max）查询网信资产
+      注意：XML中不能直接使用<、>符号，需使用转义字符
+    -->
+    <select id="selectByUsedQuantityRange" resultType="com.military.asset.entity.CyberAsset">
+        SELECT * FROM cyber_asset
+        <where>
+            <!--
+              最小数量条件：used_quantity >= #{min}
+              注意：XML中>符号需用转义字符&gt;替代
+              原因：XML解析器会将>识别为标签结束符，导致语法错误
+            -->
+            <if test="min != null">
+                used_quantity &gt;= #{min}
+            </if>
+            <!--
+              最大数量条件：used_quantity <= #{max}
+              注意：XML中<符号需用转义字符&lt;替代
+            -->
+            <if test="max != null">
+                <!--
+                  choose标签：类似Java的switch语句
+                  作用：根据min是否为空，决定是否添加AND关键字
+                -->
+                <choose>
+                    <!-- 当min不为空时，添加AND（与前面的条件拼接） -->
+                    <when test="min != null">AND used_quantity &lt;= #{max}</when>
+                    <!-- 当min为空时，直接添加条件（无需AND） -->
+                    <otherwise>used_quantity &lt;= #{max}</otherwise>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+</mapper>

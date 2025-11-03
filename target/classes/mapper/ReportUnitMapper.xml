@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- ReportUnitMapper.xml -->
+<mapper namespace="com.military.asset.mapper.ReportUnitMapper">
+    <select id="selectByProvinceNull" resultType="com.military.asset.entity.ReportUnit">
+        SELECT id, report_unit, province FROM report_unit WHERE province IS NULL or province = ''
+    </select>
+    <update id="updateProvince">
+        UPDATE report_unit SET province = #{province} WHERE id = #{id}
+    </update>
+</mapper>
