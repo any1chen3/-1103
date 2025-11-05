@@ -2,18 +2,25 @@ package com.military.asset.controller;
 
 import com.military.asset.entity.CyberAsset;
 import com.military.asset.entity.DataContentAsset;
+import com.military.asset.entity.Province;
 import com.military.asset.entity.SoftwareAsset;
+import com.military.asset.mapper.ProvinceMapper;
 import com.military.asset.service.CyberAssetService;
 import com.military.asset.service.DataContentAssetService;
 import com.military.asset.service.SoftwareAssetService;
 import com.military.asset.vo.ResultVO;
+import com.military.asset.vo.stat.ProvinceMetricVO;
 import com.military.asset.vo.stat.SoftwareAssetStatisticVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * 三表统一CRUD控制器 + 首页控制器
@@ -29,6 +36,7 @@ public class AssetCrudController {
     private final SoftwareAssetService softwareService;
     private final CyberAssetService cyberService;
     private final DataContentAssetService dataService;
+    private final ProvinceMapper provinceMapper;
 
     /**
      * 构造器注入
@@ -36,10 +44,12 @@ public class AssetCrudController {
     @Autowired
     public AssetCrudController(SoftwareAssetService softwareService,
                                CyberAssetService cyberService,
-                               DataContentAssetService dataService) {
+                               DataContentAssetService dataService,
+                               ProvinceMapper provinceMapper) {
         this.softwareService = softwareService;
         this.cyberService = cyberService;
         this.dataService = dataService;
+        this.provinceMapper = provinceMapper;
     }
 
     // ============================== 首页欢迎接口 ==============================
@@ -77,8 +87,8 @@ public class AssetCrudController {
                         "   • 数据资产列表: /api/asset/data/list?reportUnit=xxx&assetCategory=xxx\n" +
                         "   • 网信资产数量范围查询: /api/asset/cyber/quantity?min=10&max=50\n" +
                         "   • 数据资产开发工具查询: /api/asset/data/tool?developmentTool=MySQL\n\n" +
-                        "   • 数据资产信息化程度: /api/asset/data/province/information-degree?province=xxx\n" +
-                        "   • 数据资产国产化率: /api/asset/data/province/domestic-rate?province=xxx\n\n" +
+                        "   • 数据资产信息化程度（全部省份）: /api/asset/data/province/information-degree\n" +
+                        "   • 数据资产国产化率（全部省份）: /api/asset/data/province/domestic-rate\n\n" +
 
                         "📝 详情查询接口（GET请求）：\n" +
                         "   • 软件资产详情: /api/asset/software/{id}\n" +
@@ -298,25 +308,43 @@ public class AssetCrudController {
     }
 
     @GetMapping("/data/province/information-degree")
-    public ResultVO<BigDecimal> calculateInformationDegree(@RequestParam String province) {
+    public ResultVO<List<ProvinceMetricVO>> calculateInformationDegree() {
         try {
-            BigDecimal degree = dataService.calculateProvinceInformationDegree(province);
-            return ResultVO.success(degree, "信息化程度计算成功");
+            List<ProvinceMetricVO> metrics = buildProvinceMetrics(dataService::calculateProvinceInformationDegree);
+            return ResultVO.success(metrics, "各省份信息化程度计算成功");
         } catch (RuntimeException e) {
-            log.error("省份{}信息化程度计算失败", province, e);
+            log.error("各省份信息化程度批量计算失败", e);
             return ResultVO.fail("计算失败：" + e.getMessage());
         }
     }
 
     @GetMapping("/data/province/domestic-rate")
-    public ResultVO<BigDecimal> calculateDomesticRate(@RequestParam String province) {
+    public ResultVO<List<ProvinceMetricVO>> calculateDomesticRate() {
         try {
-            BigDecimal rate = dataService.calculateProvinceDomesticRate(province);
-            return ResultVO.success(rate, "国产化率计算成功");
+            List<ProvinceMetricVO> metrics = buildProvinceMetrics(dataService::calculateProvinceDomesticRate);
+            return ResultVO.success(metrics, "各省份国产化率计算成功");
         } catch (RuntimeException e) {
-            log.error("省份{}国产化率计算失败", province, e);
+            log.error("各省份国产化率批量计算失败", e);
             return ResultVO.fail("计算失败：" + e.getMessage());
         }
+    }
+
+    private List<ProvinceMetricVO> buildProvinceMetrics(Function<String, BigDecimal> calculator) {
+        List<Province> provinces = provinceMapper.selectAll();
+        if (Objects.isNull(provinces) || provinces.isEmpty()) {
+            log.warn("省份表未查询到数据，返回空列表");
+            return Collections.emptyList();
+        }
+
+        List<ProvinceMetricVO> metrics = new ArrayList<>(provinces.size());
+        for (Province province : provinces) {
+            if (province == null || province.getName() == null) {
+                continue;
+            }
+            BigDecimal value = calculator.apply(province.getName());
+            metrics.add(new ProvinceMetricVO(province.getCode(), province.getName(), value));
+        }
+        return metrics;
     }
 
     @PostMapping("/data")
